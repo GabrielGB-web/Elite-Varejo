@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import Layout from './components/Layout';
-import ClientDashboard from './components/ClientDashboard';
-import AdminPanel from './components/AdminPanel';
-import AccessScreen from './components/AccessScreen';
-import { UserRole, Store } from './types';
-import { db } from './db';
+import Layout from './components/Layout.tsx';
+import ClientDashboard from './components/ClientDashboard.tsx';
+import AdminPanel from './components/AdminPanel.tsx';
+import AccessScreen from './components/AccessScreen.tsx';
+import { UserRole, Store } from './types.ts';
+import { db } from './db.ts';
 
 const SESSION_KEY = 'varejo_elite_session';
 const ADMIN_PASSWORD = '1234'; 
