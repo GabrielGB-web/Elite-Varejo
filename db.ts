@@ -1,69 +1,96 @@
 
-import { Store } from './types';
-import { INITIAL_STORES } from './constants';
-
-const DB_KEY = 'varejo_elite_v1_database';
+import { Store, KPI } from './types';
+import { supabase } from './supabaseClient';
 
 export const db = {
-  // Retorna todos os dados salvos ou os dados iniciais
-  getStores: (): Store[] => {
-    const data = localStorage.getItem(DB_KEY);
-    if (!data) {
-      console.log("DB: Inicializando com dados padrão.");
-      return INITIAL_STORES;
+  // Retorna todos os dados salvos do Supabase
+  getStores: async (): Promise<Store[]> => {
+    const { data: stores, error } = await supabase
+      .from('stores')
+      .select('*, kpis(*)');
+
+    if (error) {
+      console.error("DB: Erro ao buscar lojas:", error);
+      return [];
     }
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      console.error("DB: Erro ao ler banco de dados. Resetando...", e);
-      return INITIAL_STORES;
+
+    // Mapear os dados para o formato esperado pelo app (snake_case para camelCase e JSONb)
+    return stores.map(s => ({
+      id: s.id,
+      code: s.code,
+      razaoSocial: s.razao_social,
+      fantasia: s.fantasia,
+      manager: s.manager,
+      lastUpdate: s.last_update,
+      customRewards: s.custom_rewards,
+      tierColors: s.tier_colors,
+      kpis: (s.kpis || []).map((k: any) => ({
+        id: k.id,
+        name: k.name,
+        description: k.description,
+        category: k.category,
+        target: k.target,
+        actual: k.actual,
+        unit: k.unit,
+        weight: k.weight
+      }))
+    })) as Store[];
+  },
+
+  // Salva ou atualiza uma loja no Supabase
+  saveStore: async (store: Store) => {
+    const { data, error } = await supabase
+      .from('stores')
+      .upsert({
+        id: store.id,
+        code: store.code,
+        razao_social: store.razaoSocial,
+        fantasia: store.fantasia,
+        manager: store.manager,
+        last_update: store.lastUpdate,
+        custom_rewards: store.customRewards,
+        tier_colors: store.tierColors
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("DB: Erro ao salvar loja:", error);
+      return null;
     }
+
+    // Salvar/Atualizar KPIs relacionados
+    if (store.kpis && store.kpis.length > 0) {
+      const kpisToUpsert = store.kpis.map(k => ({
+        id: k.id,
+        store_id: data.id,
+        name: k.name,
+        description: k.description,
+        category: k.category,
+        target: k.target,
+        actual: k.actual,
+        unit: k.unit,
+        weight: k.weight
+      }));
+
+      const { error: kpiError } = await supabase
+        .from('kpis')
+        .upsert(kpisToUpsert);
+
+      if (kpiError) console.error("DB: Erro ao salvar KPIs:", kpiError);
+    }
+
+    return data;
   },
 
-  // Salva o estado atual no "disco" (LocalStorage)
-  saveStores: (stores: Store[]) => {
-    localStorage.setItem(DB_KEY, JSON.stringify(stores));
-    console.log("DB: Alterações persistidas com sucesso.");
-  },
+  // Deleta uma loja
+  deleteStore: async (id: string) => {
+    const { error } = await supabase
+      .from('stores')
+      .delete()
+      .eq('id', id);
 
-  // Exporta o banco de dados como um arquivo JSON
-  exportBackup: () => {
-    const data = JSON.stringify(db.getStores(), null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const timestamp = new Date().toISOString().split('T')[0];
-    link.href = url;
-    link.download = `varejo-elite-db-backup-${timestamp}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  },
-
-  // Importa dados de um arquivo e substitui o banco atual
-  importBackup: (file: File): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const content = e.target?.result as string;
-          const parsed = JSON.parse(content);
-          if (Array.isArray(parsed)) {
-            db.saveStores(parsed);
-            resolve(true);
-          } else {
-            resolve(false);
-          }
-        } catch {
-          resolve(false);
-        }
-      };
-      reader.readAsText(file);
-    });
-  },
-
-  // Limpa o banco de dados
-  clearDB: () => {
-    localStorage.removeItem(DB_KEY);
-    window.location.reload();
+    if (error) console.error("DB: Erro ao deletar loja:", error);
+    return !error;
   }
 };

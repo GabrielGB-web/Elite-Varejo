@@ -1,11 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { Store, KPI } from "./types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 export const getStoreInsights = async (store: Store) => {
-  const kpiDetails = store.kpis.map(k => 
-    `- ${k.name}: Alvo ${k.target}${k.unit}, Realizado ${k.actual}${k.unit} (${Math.round((k.actual/k.target)*100)}%)`
+  const kpiDetails = store.kpis.map(k =>
+    `- ${k.name}: Alvo ${k.target}${k.unit}, Realizado ${k.actual}${k.unit} (${Math.round((k.actual / k.target) * 100)}%)`
   ).join('\n');
 
   const prompt = `
